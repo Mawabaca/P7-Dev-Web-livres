@@ -27,22 +27,24 @@ module.exports.resizeImage = (req, res, next) => {
   if (!req.file) {
     return next();
   }
-
-  const filePath = req.file.path;
-  const fileName = req.file.filename;
-  const outputFilePath = path.join('images', `resized_${fileName}`);
-
-  sharp(filePath)
-    .resize({ width: 206, height: 260 })
-    .toFile(outputFilePath)
+  const originalPath = req.file.path; 
+  const originalName = req.file.filename; 
+  const resizedPath = path.join('images', `resized_${originalName}`); 
+  sharp(originalPath)
+    .resize(500, 250) 
+    .toFile(resizedPath)
     .then(() => {
-      fs.unlink(filePath, () => {
-        req.file.path = outputFilePath;
+      fs.unlink(originalPath, (err) => {
+        if (err) {
+          console.error('Erreur lors de la suppression de l\'image originale :', err);
+        }
+     
+        req.file.path = resizedPath;
         next();
       });
     })
-    .catch(err => {
-      console.log(err);
-      return next();
+    .catch((error) => {
+      console.error('Erreur lors du redimensionnement de l\'image :', error);
+      next(); 
     });
 };
