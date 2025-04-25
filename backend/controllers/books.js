@@ -48,28 +48,36 @@ exports.createBook = (req, res, next) => {
 
 
 
-exports.modifyBook = (req, res, next) => {
-  const bookObject = req.file
-    ? {
-        ...JSON.parse(req.body.book),
-        imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
-      }
-    : { ...req.body };
-
-  delete bookObject._userId;
-
-  Book.findOne({ _id: req.params.id })
-    .then(book => {
-      if (book.userId !== req.auth.userId) {
-        return res.status(401).json({ message: 'Non autorisé' });
-      }
-
-      Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
-        .then(() => res.status(200).json({ message: 'Livre modifié !' }))
-        .catch(error => res.status(400).json({ error }));
-    })
-    .catch(error => res.status(400).json({ error }));
-};
+  exports.modifyBook = (req, res, next) => {
+    const bookObject = req.file
+      ? {
+          ...JSON.parse(req.body.book),
+          imageUrl: `${req.protocol}://${req.get('host')}/images/${req.file.filename}`
+        }
+      : { ...req.body }
+    delete bookObject._userId
+  
+    Book.findOne({ _id: req.params.id })
+      .then(book => {
+        if (book.userId !== req.auth.userId) {
+          return res.status(401).json({ message: 'Non autorisé' })
+        }
+  
+        if (req.file && book.imageUrl) {
+          const oldFilename = book.imageUrl.split('/images/')[1]
+          fs.unlink(path.join('images', oldFilename), () => {
+            Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+              .then(() => res.status(200).json({ message: 'Livre modifié !' }))
+              .catch(error => res.status(400).json({ error }))
+          })
+        } else {
+          Book.updateOne({ _id: req.params.id }, { ...bookObject, _id: req.params.id })
+            .then(() => res.status(200).json({ message: 'Livre modifié !' }))
+            .catch(error => res.status(400).json({ error }))
+        }
+      })
+      .catch(error => res.status(400).json({ error }))
+  }
 
 
 
@@ -96,11 +104,11 @@ exports.deleteBook = (req, res, next) => {
 exports.addRating = (req, res, next) => {
   try {
     const userId = req.auth.userId;
-    const grade = Number(req.body.grade);
-    if (isNaN(grade) || grade < 0 || grade > 5) {
+    const grade = req.body.rating ?? null;
+  
+    if (grade === null || isNaN(grade) || grade < 0 || grade > 5) {
       return res.status(400).json({ error: 'Note invalide (0-5).' });
     }
-
     Book.findOne({ _id: req.params.id })
       .then(book => {
         if (!book) {
@@ -122,3 +130,14 @@ exports.addRating = (req, res, next) => {
     res.status(500).json({ error: 'Format de données invalide.' });
   }
 };
+
+
+exports.bestRating = (req, res, next) => {
+
+  Book.find().sort({ averageRating: -1 }).limit(3)
+    .then(books => {
+      console.log(books);
+      books ? res.status(200).json( books ): res.status(404).json({ error: 'Aucun livre trouvé.' });
+    })
+    .catch(error => res.status(500).json({ error: 'Erreur interne.' }));
+}
