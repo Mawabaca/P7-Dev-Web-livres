@@ -1,50 +1,41 @@
 const multer = require('multer');
-const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs');
+const sharp  = require('sharp');
+const path   = require('path');
+const fs     = require('fs');
 
 const MIME_TYPES = {
-  'image/jpg': 'jpg',
+  'image/jpg':  'jpg',
   'image/jpeg': 'jpg',
-  'image/png': 'png'
+  'image/png':  'png'
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, callback) => {
-    callback(null, 'images');
-  },
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).single('image');
+const resizeImage = async (req, res, next) => {
+  if (!req.file) return next();
 
-  filename: (req, file, callback) => {
-    const name = file.originalname.replace(/[\s.]+/g, '_');
-    const extension = MIME_TYPES[file.mimetype];
-    callback(null, name + Date.now() + '.' + extension);
+  try {
+    const ext    = MIME_TYPES[req.file.mimetype];
+    const base   = req.file.originalname.replace(/[\s.]+/g, '_') + Date.now();
+    const name   = `resized_${base}.${ext}`;
+    const outDir = path.join('images', name);
+
+    await sharp(req.file.buffer)
+      .resize(500, 250)
+      .toFile(outDir);
+
+    if (req.book && req.book.imagePath) {
+      const oldPath = path.join('images', req.book.imagePath);
+      fs.unlink(oldPath, err => { if (err) console.error('Suppression ancienne image :', err); });
+    }
+    req.file.filename = name;
+    req.file.path     = outDir;
+
+    next();
+  } catch (err) {
+    console.error('Erreur resizeImage :', err);
+    next(err);
   }
-});
-
-module.exports = multer({storage: storage}).single('image');
-
-module.exports.resizeImage = (req, res, next) => {
-  if (!req.file) {
-    return next();
-  }
-  const originalPath = req.file.path; 
-  const originalName = req.file.filename; 
-  const resizedPath = path.join('images', `resized_${originalName}`); 
-  sharp(originalPath)
-    .resize(500, 250) 
-    .toFile(resizedPath)
-    .then(() => {
-      fs.unlink(originalPath, (err) => {
-        if (err) {
-          console.error('Erreur lors de la suppression de l\'image originale :', err);
-        }
-     
-        req.file.path = resizedPath;
-        next();
-      });
-    })
-    .catch((error) => {
-      console.error('Erreur lors du redimensionnement de l\'image :', error);
-      next(); 
-    });
 };
+
+module.exports = { upload, resizeImage };
