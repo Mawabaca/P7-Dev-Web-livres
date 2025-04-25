@@ -93,51 +93,32 @@ exports.deleteBook = (req, res, next) => {
 
 
 
-exports.addRating = async (req, res) => {
+exports.addRating = (req, res, next) => {
   try {
     const userId = req.auth.userId;
-    const grade  = Number(req.body.grade);
+    const grade = Number(req.body.grade);
     if (isNaN(grade) || grade < 0 || grade > 5) {
       return res.status(400).json({ error: 'Note invalide (0-5).' });
     }
-    const book = await Book.findById(req.params.id);
-    if (!book) {
-      return res.status(404).json({ error: 'Livre introuvable.' });
-    }
-    if (book.ratings.some(r => r.userId === userId)) {
-      return res.status(409).json({ error: 'Vous avez déjà noté ce livre.' });
-    }
-    book.ratings.push({ userId, grade });
-    const sum = book.ratings.reduce((acc, r) => acc + r.grade, 0);
-    book.averageRating = Math.round((sum / book.ratings.length) * 10) / 10;
-    const updated = await book.save();
-    res.status(200).json({ message: 'Note ajoutée.', book: updated });
-  } catch (err) {
-    res.status(500).json({ error: 'Erreur interne.' });
-  }
-};
 
-exports.updateRating = async (req, res) => {
-  try {
-    const userId = req.auth.userId;
-    const grade  = Number(req.body.grade);
-    if (isNaN(grade) || grade < 0 || grade > 5) {
-      return res.status(400).json({ error: 'Note invalide (0-5).' });
-    }
-    const book = await Book.findById(req.params.id);
-    if (!book) {
-      return res.status(404).json({ error: 'Livre introuvable.' });
-    }
-    const rating = book.ratings.find(r => r.userId === userId);
-    if (!rating) {
-      return res.status(404).json({ error: 'Vous n’avez pas encore noté ce livre.' });
-    }
-    rating.grade = grade;
-    const sum = book.ratings.reduce((acc, r) => acc + r.grade, 0);
-    book.averageRating = Math.round((sum / book.ratings.length) * 10) / 10;
-    const updated = await book.save();
-    res.status(200).json({ message: 'Note modifiée.', book: updated });
+    Book.findOne({ _id: req.params.id })
+      .then(book => {
+        if (!book) {
+          return res.status(404).json({ error: 'Livre introuvable.' });
+        }
+        if (book.ratings.some(r => r.userId === userId)) {
+          return res.status(409).json({ error: 'Vous avez déjà noté ce livre.' });
+        }
+
+        book.ratings.push({ userId, grade });
+        const sum = book.ratings.reduce((acc, r) => acc + r.grade, 0);
+        book.averageRating = Math.round((sum / book.ratings.length) * 10) / 10;
+
+        return book.save()
+          .then(updatedBook => res.status(200).json({ message: 'Note ajoutée.', book: updatedBook }));
+      })
+      .catch(error => res.status(500).json({ error: 'Erreur interne.' }));
   } catch (err) {
-    res.status(500).json({ error: 'Erreur interne.' });
+    res.status(500).json({ error: 'Format de données invalide.' });
   }
 };
