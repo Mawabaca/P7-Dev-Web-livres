@@ -98,37 +98,67 @@ exports.deleteBook = (req, res, next) => {
     .catch(error => res.status(500).json({ error }));
 };
 
+// exports.addRating = (req, res, next) => {
+//     const userId = req.auth.userId;
+//     const grade = req.body.rating ?? null;
+  
+//     if (grade === null || isNaN(grade) || grade < 0 || grade > 5) {
+//       return res.status(400).json({ error: 'Note invalide (0-5).' });
+//     }
+
+//     Book.findOne({ _id: req.params.id })
+
+//       .then(book => {
+//         if (!book) {
+//           return res.status(404).json({ error: 'Livre introuvable.' });
+//         }
+        
+//         if (book.ratings.some(r => r.userId === userId)) {
+//           return res.status(409).json({ error: 'Vous avez déjà noté ce livre.' });
+//         }
+
+//         book.ratings.push({ userId, grade });
+//         const sum = book.ratings.reduce((acc, r) => acc + r.grade, 0);
+//         book.averageRating = Math.round((sum / book.ratings.length) * 10) / 10;
+
+//         book.save()
+//           .then(updatedBook => res.status(200).json(updatedBook))
+//           .catch(error => res.status(400).json({ error: 'Enregistrement impossible' }));
+//       })
+
+//       .catch(error => res.status(500).json({ error: 'Erreur interne.' }));
+// };
 
 
+exports.addRating = async (req, res, next) => {
 
-exports.addRating = (req, res, next) => {
-  try {
+  try{
     const userId = req.auth.userId;
     const grade = req.body.rating ?? null;
-  
+
     if (grade === null || isNaN(grade) || grade < 0 || grade > 5) {
       return res.status(400).json({ error: 'Note invalide (0-5).' });
     }
-    Book.findOne({ _id: req.params.id })
-      .then(book => {
+    
+    let book = await Book.findOne({ _id: req.params.id })
         if (!book) {
           return res.status(404).json({ error: 'Livre introuvable.' });
         }
+
         if (book.ratings.some(r => r.userId === userId)) {
           return res.status(409).json({ error: 'Vous avez déjà noté ce livre.' });
         }
-
+        
         book.ratings.push({ userId, grade });
         const sum = book.ratings.reduce((acc, r) => acc + r.grade, 0);
         book.averageRating = Math.round((sum / book.ratings.length) * 10) / 10;
 
-        return book.save()
-          .then(updatedBook => res.status(200).json({ message: 'Note ajoutée.', book: updatedBook }));
-      })
-      .catch(error => res.status(500).json({ error: 'Erreur interne.' }));
-  } catch (err) {
-    res.status(500).json({ error: 'Format de données invalide.' });
-  }
+        let updatedBook = await book.save()
+        res.status(200).json(updatedBook)
+      }
+      catch(error) {
+        res.status(500).json({message:'Erreur Interne' })
+      }
 };
 
 
